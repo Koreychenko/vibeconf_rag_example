@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension for vector similarity search
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: rag-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ragdb}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag-network
+
+  # Application container for the RAG service
+  app:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: rag-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-ragdb}
+      - DB_SSL_MODE=${DB_SSL_MODE:-disable}
+      - SERVER_PORT=${SERVER_PORT:-8080}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_TEXT_MODEL=${GEMINI_TEXT_MODEL:-gemini-1.5-pro}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-embedding-001}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-768}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - rag-network
+    restart: on-failure
+
+volumes:
+  postgres_data:
+
+networks:
+  rag-network:
+    driver: bridge
