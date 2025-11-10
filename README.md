@@ -20,33 +20,96 @@ The system implements a RAG (Retrieval Augmented Generation) pattern:
 - RESTful API for all operations
 - Makefile for common development tasks
 - Bulk data loading from files and directories
+- Comprehensive testing suite
+- Flexible deployment options (Docker or standalone)
 
 ## Requirements
 
-- Docker and Docker Compose
+- Docker and Docker Compose (for containerized deployment)
+- Go 1.24 or later (for local development)
 - Google Gemini API key
-- Go 1.21 or later (for local development)
+- PostgreSQL with pgvector extension (for local development without Docker)
 
 ## Getting Started
 
+### Running with Docker (Recommended)
+
+The easiest way to get started is using Docker, which handles all dependencies including PostgreSQL with pgvector:
+
 1. Clone the repository
-2. Configure the `.env` file (see Environment Variables section)
-3. Build and run the containers:
+   ```bash
+   git clone <repository-url>
+   cd go-rag
+   ```
 
-```bash
-# Using docker-compose directly
-docker-compose -f deployments/docker-compose.yml up -d
+2. Create a `.env` file in the project root (see [Environment Variables](#environment-variables) section)
+   ```bash
+   cp .env.dist .env
+   # Edit the .env file to add your GEMINI_API_KEY
+   ```
 
-# Or using the Makefile
-make docker-up
-```
+3. Start the containers:
+   ```bash
+   make docker-up
+   ```
+   This will start both the PostgreSQL database and the RAG service.
 
-4. Load sample data (optional):
+4. Check if the containers are running:
+   ```bash
+   make docker-ps
+   ```
 
-```bash
-# Using the Makefile
-make docker-load-samples
-```
+5. Load sample data (optional):
+   ```bash
+   make docker-load-samples
+   ```
+
+6. Test the API using curl or any API client:
+   ```bash
+   curl http://localhost:8080/health
+   ```
+
+7. To stop the containers:
+   ```bash
+   make docker-down
+   ```
+
+### Running Without Docker (Local Development)
+
+For local development without Docker:
+
+1. Clone the repository
+   ```bash
+   git clone <repository-url>
+   cd go-rag
+   ```
+
+2. Install PostgreSQL with pgvector extension
+   - For Ubuntu/Debian: `apt-get install postgresql postgresql-contrib`
+   - For macOS: `brew install postgresql`
+   - Then install pgvector (see [pgvector installation](https://github.com/pgvector/pgvector#installation))
+
+3. Initialize the database
+   - Create a database: `createdb ragdb`
+   - Run the initialization script: `psql -d ragdb -f deployments/init-scripts/01-init-pgvector.sql`
+
+4. Create a `.env` file and update database connection details
+   ```bash
+   cp .env.dist .env
+   # Update DB_HOST, DB_USER, DB_PASSWORD and add your GEMINI_API_KEY
+   ```
+
+5. Build and run the application
+   ```bash
+   make build
+   make run
+   ```
+
+6. Build the data loader and load sample data (optional)
+   ```bash
+   make build-loader
+   make load-samples
+   ```
 
 ## Environment Variables
 
@@ -66,8 +129,8 @@ DB_SSL_MODE=disable
 
 # Google Gemini API configuration
 GEMINI_API_KEY=your-gemini-api-key  # Replace with your actual API key
-GEMINI_TEXT_MODEL=gemini-2.5-flash
-GEMINI_EMBEDDING_MODEL=embedding-001
+GEMINI_TEXT_MODEL=gemini-2.5-flash  # Current recommended model for text generation
+GEMINI_EMBEDDING_MODEL=embedding-001  # Model for generating vector embeddings
 
 # Vector dimensions for embeddings
 EMBEDDING_DIMENSIONS=768
@@ -75,31 +138,32 @@ EMBEDDING_DIMENSIONS=768
 
 ## Makefile Commands
 
-The project includes a Makefile with various commands to simplify development:
+The project includes a Makefile with various commands to simplify development. Use `make help` to see all available commands.
 
-```
+### Local Development Commands
+```bash
 # Build and run
 make build         # Build the application
-make run           # Run the application locally
+make run           # Run the application locally (requires local PostgreSQL setup)
 make clean         # Clean build artifacts
 make fmt           # Format Go code
 make test          # Run tests
+make build-loader  # Build the data loader
+make load-samples  # Load sample data locally (requires running database)
+```
 
+### Docker Commands
+```bash
 # Docker operations
 make docker-up     # Start all containers in the background
 make docker-down   # Stop all containers
-make docker-logs   # Start all containers with logs in foreground
+make docker-logs   # Start all containers with logs in foreground (useful for debugging)
 make docker-rebuild # Rebuild and restart only the app container
 make docker-ps     # Show Docker container status
-
-# Data loading
-make build-loader  # Build the data loader
-make load-samples  # Load sample data locally
 make docker-load-samples # Load sample data in Docker container
 
-# Development setup
-make dev-setup     # Set up the development environment
-make help          # Show help message
+# Quick development setup
+make dev-setup     # Set up the development environment (builds and starts containers)
 ```
 
 ## Data Loading
